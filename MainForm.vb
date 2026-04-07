@@ -94,21 +94,22 @@ Public Class StudioMonitorControl
         headerTextBox.Text = studioName
 
         fileInfoPanel.Location = New Point(42, 68)
-        fileInfoPanel.Size = New Size(336, 116)
+        fileInfoPanel.Size = New Size(336, 132)
         fileInfoPanel.BorderStyle = BorderStyle.FixedSingle
         fileInfoPanel.BackColor = Color.FromArgb(245, 245, 245)
 
-        fileNameLabel.Font = New Font("Segoe UI", 20.0F, FontStyle.Bold)
+        fileNameLabel.Font = New Font("Segoe UI", 18.0F, FontStyle.Bold)
         fileNameLabel.Location = New Point(12, 10)
-        fileNameLabel.Size = New Size(308, 48)
-        fileNameLabel.TextAlign = ContentAlignment.MiddleLeft
+        fileNameLabel.Size = New Size(308, 64)
+        fileNameLabel.TextAlign = ContentAlignment.TopLeft
+        fileNameLabel.AutoEllipsis = False
         fileNameLabel.Text = "Waiting for OSC data..."
 
-        remainingLargeLabel.Font = New Font("Segoe UI", 26.0F, FontStyle.Bold)
+        remainingLargeLabel.Font = New Font("Segoe UI", 34.0F, FontStyle.Bold)
         remainingLargeLabel.ForeColor = Color.DarkRed
-        remainingLargeLabel.Location = New Point(12, 60)
-        remainingLargeLabel.Size = New Size(308, 40)
-        remainingLargeLabel.TextAlign = ContentAlignment.MiddleLeft
+        remainingLargeLabel.Location = New Point(12, 78)
+        remainingLargeLabel.Size = New Size(308, 50)
+        remainingLargeLabel.TextAlign = ContentAlignment.MiddleCenter
         remainingLargeLabel.Text = "--:--:--"
 
         fileInfoPanel.Controls.Add(fileNameLabel)
@@ -970,3 +971,7 @@ Public Class StudioMonitorControl
         MyBase.Dispose(disposing)
     End Sub
 End Class
+
+
+
+
