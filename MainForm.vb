@@ -9,10 +9,10 @@ Imports System.Text
 Imports System.Threading.Tasks
 Imports System.Windows.Forms
 
-Public Class MainForm
-    Inherits Form
+Public Class StudioMonitorControl
+    Inherits UserControl
 
-    Private ReadOnly titleLabel As New Label()
+    Private ReadOnly headerTextBox As New TextBox()
     Private ReadOnly fileInfoPanel As New Panel()
     Private ReadOnly fileNameLabel As New Label()
     Private ReadOnly remainingLargeLabel As New Label()
@@ -68,13 +68,12 @@ Public Class MainForm
     Private selectedChannel As Integer = 1
     Private selectedLayer As Integer = 1
     Private pendingUiRefresh As Boolean = False
+    Private hasStarted As Boolean = False
 
-    Public Sub New()
-        Text = "CasparCG OSC Running File Monitor"
-        StartPosition = FormStartPosition.CenterScreen
-        FormBorderStyle = FormBorderStyle.FixedDialog
-        MaximizeBox = False
-        ClientSize = New Size(520, 420)
+    Public Sub New(Optional studioName As String = "Studio A")
+        DoubleBuffered = True
+        BackColor = SystemColors.Control
+        Size = New Size(420, 430)
 
         leftAudioMeterPanel.Location = New Point(6, 18)
         leftAudioMeterPanel.Size = New Size(24, 360)
@@ -82,32 +81,33 @@ Public Class MainForm
         leftAudioMeterPanel.BackColor = Color.FromArgb(18, 18, 18)
         AddHandler leftAudioMeterPanel.Paint, AddressOf LeftAudioMeterPanel_Paint
 
-        rightAudioMeterPanel.Location = New Point(490, 18)
+        rightAudioMeterPanel.Location = New Point(390, 18)
         rightAudioMeterPanel.Size = New Size(24, 360)
         rightAudioMeterPanel.BorderStyle = BorderStyle.FixedSingle
         rightAudioMeterPanel.BackColor = Color.FromArgb(18, 18, 18)
         AddHandler rightAudioMeterPanel.Paint, AddressOf RightAudioMeterPanel_Paint
 
-        titleLabel.AutoSize = True
-        titleLabel.Font = New Font("Segoe UI Semibold", 15.0F, FontStyle.Bold)
-        titleLabel.Location = New Point(46, 18)
-        titleLabel.Text = "CasparCG OSC Layer Monitor"
+        headerTextBox.BorderStyle = BorderStyle.None
+        headerTextBox.Font = New Font("Segoe UI Semibold", 18.0F, FontStyle.Bold)
+        headerTextBox.Location = New Point(42, 20)
+        headerTextBox.Size = New Size(336, 40)
+        headerTextBox.Text = studioName
 
-        fileInfoPanel.Location = New Point(46, 58)
-        fileInfoPanel.Size = New Size(430, 112)
+        fileInfoPanel.Location = New Point(42, 68)
+        fileInfoPanel.Size = New Size(336, 116)
         fileInfoPanel.BorderStyle = BorderStyle.FixedSingle
         fileInfoPanel.BackColor = Color.FromArgb(245, 245, 245)
 
-        fileNameLabel.Font = New Font("Segoe UI", 21.0F, FontStyle.Bold)
+        fileNameLabel.Font = New Font("Segoe UI", 20.0F, FontStyle.Bold)
         fileNameLabel.Location = New Point(12, 10)
-        fileNameLabel.Size = New Size(404, 48)
+        fileNameLabel.Size = New Size(308, 48)
         fileNameLabel.TextAlign = ContentAlignment.MiddleLeft
         fileNameLabel.Text = "Waiting for OSC data..."
 
         remainingLargeLabel.Font = New Font("Segoe UI", 26.0F, FontStyle.Bold)
         remainingLargeLabel.ForeColor = Color.DarkRed
         remainingLargeLabel.Location = New Point(12, 60)
-        remainingLargeLabel.Size = New Size(404, 40)
+        remainingLargeLabel.Size = New Size(308, 40)
         remainingLargeLabel.TextAlign = ContentAlignment.MiddleLeft
         remainingLargeLabel.Text = "--:--:--"
 
@@ -115,42 +115,42 @@ Public Class MainForm
         fileInfoPanel.Controls.Add(remainingLargeLabel)
 
         sourceHostLabel.AutoSize = True
-        sourceHostLabel.Location = New Point(46, 188)
+        sourceHostLabel.Location = New Point(42, 198)
         sourceHostLabel.Text = "Source IP"
 
-        sourceHostTextBox.Location = New Point(46, 208)
-        sourceHostTextBox.Size = New Size(210, 27)
+        sourceHostTextBox.Location = New Point(42, 218)
+        sourceHostTextBox.Size = New Size(220, 27)
         sourceHostTextBox.Text = "127.0.0.1"
 
         listenPortLabel.AutoSize = True
-        listenPortLabel.Location = New Point(46, 242)
+        listenPortLabel.Location = New Point(42, 254)
         listenPortLabel.Text = "OSC Port"
 
-        listenPortUpDown.Location = New Point(46, 262)
+        listenPortUpDown.Location = New Point(42, 274)
         listenPortUpDown.Maximum = 65535D
         listenPortUpDown.Value = 6250D
         listenPortUpDown.Size = New Size(120, 27)
 
         channelLabel.AutoSize = True
-        channelLabel.Location = New Point(190, 242)
+        channelLabel.Location = New Point(42, 310)
         channelLabel.Text = "Channel"
 
-        channelUpDown.Location = New Point(190, 262)
+        channelUpDown.Location = New Point(42, 330)
         channelUpDown.Minimum = 1D
         channelUpDown.Value = 1D
-        channelUpDown.Size = New Size(90, 27)
+        channelUpDown.Size = New Size(120, 27)
 
         layerLabel.AutoSize = True
-        layerLabel.Location = New Point(304, 242)
+        layerLabel.Location = New Point(184, 310)
         layerLabel.Text = "Layer"
 
-        layerUpDown.Location = New Point(304, 262)
+        layerUpDown.Location = New Point(184, 330)
         layerUpDown.Minimum = 1D
         layerUpDown.Value = 1D
-        layerUpDown.Size = New Size(90, 27)
+        layerUpDown.Size = New Size(120, 27)
 
-        restartButton.Location = New Point(46, 314)
-        restartButton.Size = New Size(348, 36)
+        restartButton.Location = New Point(42, 378)
+        restartButton.Size = New Size(262, 34)
         restartButton.Text = "Restart OSC Listener"
         AddHandler restartButton.Click, AddressOf RestartButton_Click
 
@@ -201,7 +201,7 @@ Public Class MainForm
 
         Controls.Add(leftAudioMeterPanel)
         Controls.Add(rightAudioMeterPanel)
-        Controls.Add(titleLabel)
+        Controls.Add(headerTextBox)
         Controls.Add(fileInfoPanel)
         Controls.Add(sourceHostLabel)
         Controls.Add(sourceHostTextBox)
@@ -222,10 +222,15 @@ Public Class MainForm
         Controls.Add(addressValueLabel)
         Controls.Add(statusLabel)
 
-        AddHandler Shown, AddressOf MainForm_Shown
+        AddHandler Load, AddressOf StudioMonitorControl_Load
     End Sub
 
-    Private Async Sub MainForm_Shown(sender As Object, e As EventArgs)
+    Private Async Sub StudioMonitorControl_Load(sender As Object, e As EventArgs)
+        If hasStarted Then
+            Return
+        End If
+
+        hasStarted = True
         Await RestartListenerAsync()
     End Sub
 
@@ -956,9 +961,12 @@ Public Class MainForm
         End If
     End Sub
 
-    Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)
-        uiRefreshTimer.Stop()
-        StopListener()
-        MyBase.OnFormClosing(e)
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        If disposing Then
+            uiRefreshTimer.Stop()
+            StopListener()
+        End If
+
+        MyBase.Dispose(disposing)
     End Sub
 End Class
