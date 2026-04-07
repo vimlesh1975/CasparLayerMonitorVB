@@ -1,6 +1,7 @@
 Option Strict On
 Option Explicit On
 
+Imports System.Collections.Generic
 Imports System.Drawing
 Imports System.IO
 Imports System.Net
@@ -37,6 +38,7 @@ Public Class StudioMonitorControl
     Private ReadOnly addressValueLabel As New Label()
     Private ReadOnly statusLabel As New Label()
     Private ReadOnly uiRefreshTimer As New Timer()
+    Private ReadOnly monitorId As String
 
     Private listener As UdpClient
     Private listenerTask As Task
@@ -70,7 +72,10 @@ Public Class StudioMonitorControl
     Private pendingUiRefresh As Boolean = False
     Private hasStarted As Boolean = False
 
+    Private Shared ReadOnly settingsFilePath As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CasparLayerMonitorVB", "monitor-settings.txt")
+
     Public Sub New(Optional studioName As String = "Studio A")
+        monitorId = studioName
         DoubleBuffered = True
         BackColor = SystemColors.Control
         Size = New Size(420, 430)
@@ -121,7 +126,7 @@ Public Class StudioMonitorControl
 
         sourceHostTextBox.Location = New Point(42, 218)
         sourceHostTextBox.Size = New Size(220, 27)
-        sourceHostTextBox.Text = "127.0.0.1"
+        sourceHostTextBox.Text = LoadSavedTextSetting("SourceIp", "127.0.0.1")
 
         listenPortLabel.AutoSize = True
         listenPortLabel.Location = New Point(42, 254)
@@ -129,7 +134,7 @@ Public Class StudioMonitorControl
 
         listenPortUpDown.Location = New Point(42, 274)
         listenPortUpDown.Maximum = 65535D
-        listenPortUpDown.Value = 6250D
+        listenPortUpDown.Value = LoadSavedDecimalSetting("ListenPort", 6250D, listenPortUpDown.Minimum, listenPortUpDown.Maximum)
         listenPortUpDown.Size = New Size(120, 27)
 
         channelLabel.AutoSize = True
@@ -138,7 +143,7 @@ Public Class StudioMonitorControl
 
         channelUpDown.Location = New Point(42, 330)
         channelUpDown.Minimum = 1D
-        channelUpDown.Value = 1D
+        channelUpDown.Value = LoadSavedDecimalSetting("Channel", 1D, channelUpDown.Minimum, channelUpDown.Maximum)
         channelUpDown.Size = New Size(120, 27)
 
         layerLabel.AutoSize = True
@@ -147,7 +152,7 @@ Public Class StudioMonitorControl
 
         layerUpDown.Location = New Point(184, 330)
         layerUpDown.Minimum = 1D
-        layerUpDown.Value = 1D
+        layerUpDown.Value = LoadSavedDecimalSetting("Layer", 1D, layerUpDown.Minimum, layerUpDown.Maximum)
         layerUpDown.Size = New Size(120, 27)
 
         restartButton.Location = New Point(42, 378)
@@ -239,6 +244,77 @@ Public Class StudioMonitorControl
         Await RestartListenerAsync()
     End Sub
 
+    Private Function LoadSavedTextSetting(settingName As String, defaultValue As String) As String
+        Dim savedSettings = LoadSettingsFile()
+        Dim savedValue As String = Nothing
+        If savedSettings.TryGetValue(GetMonitorSettingKey(settingName), savedValue) AndAlso Not String.IsNullOrWhiteSpace(savedValue) Then
+            Return savedValue.Trim()
+        End If
+
+        Return defaultValue
+    End Function
+
+    Private Function LoadSavedDecimalSetting(settingName As String, defaultValue As Decimal, minimum As Decimal, maximum As Decimal) As Decimal
+        Dim savedValue = LoadSavedTextSetting(settingName, defaultValue.ToString(Globalization.CultureInfo.InvariantCulture))
+        Dim parsedValue As Decimal
+        If Decimal.TryParse(savedValue, Globalization.NumberStyles.Number, Globalization.CultureInfo.InvariantCulture, parsedValue) Then
+            Return Math.Max(minimum, Math.Min(maximum, parsedValue))
+        End If
+
+        Return defaultValue
+    End Function
+
+    Private Sub SaveMonitorSettings()
+        Dim settings = LoadSettingsFile()
+        settings(GetMonitorSettingKey("SourceIp")) = sourceHostTextBox.Text.Trim()
+        settings(GetMonitorSettingKey("ListenPort")) = listenPortUpDown.Value.ToString(Globalization.CultureInfo.InvariantCulture)
+        settings(GetMonitorSettingKey("Channel")) = channelUpDown.Value.ToString(Globalization.CultureInfo.InvariantCulture)
+        settings(GetMonitorSettingKey("Layer")) = layerUpDown.Value.ToString(Globalization.CultureInfo.InvariantCulture)
+
+        Dim settingsDirectory = Path.GetDirectoryName(settingsFilePath)
+        If Not Directory.Exists(settingsDirectory) Then
+            Directory.CreateDirectory(settingsDirectory)
+        End If
+
+        Dim lines As New List(Of String)()
+        For Each pair In settings
+            lines.Add(pair.Key & "=" & pair.Value)
+        Next
+
+        File.WriteAllLines(settingsFilePath, lines)
+    End Sub
+
+    Private Shared Function LoadSettingsFile() As Dictionary(Of String, String)
+        Dim settings As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+
+        If Not File.Exists(settingsFilePath) Then
+            Return settings
+        End If
+
+        For Each rawLine In File.ReadAllLines(settingsFilePath)
+            Dim line = rawLine.Trim()
+            If line.Length = 0 Then
+                Continue For
+            End If
+
+            Dim separatorIndex = line.IndexOf("="c)
+            If separatorIndex <= 0 Then
+                Continue For
+            End If
+
+            Dim key = line.Substring(0, separatorIndex).Trim()
+            Dim value = line.Substring(separatorIndex + 1).Trim()
+            If key.Length > 0 Then
+                settings(key) = value
+            End If
+        Next
+
+        Return settings
+    End Function
+
+    Private Function GetMonitorSettingKey(settingName As String) As String
+        Return monitorId.Replace(" "c, "_"c).ToUpperInvariant() & "_" & settingName
+    End Function
     Private Async Function RestartListenerAsync() As Task
         restartButton.Enabled = False
         statusLabel.Text = "Starting OSC listener..."
@@ -251,6 +327,7 @@ Public Class StudioMonitorControl
             selectedSourceIp = sourceHostTextBox.Text.Trim()
             selectedChannel = Decimal.ToInt32(channelUpDown.Value)
             selectedLayer = Decimal.ToInt32(layerUpDown.Value)
+            SaveMonitorSettings()
             listener = New UdpClient(port)
             listenerTask = Task.Run(Function() ListenLoopAsync(listener))
 
@@ -263,6 +340,12 @@ Public Class StudioMonitorControl
 
         Await Task.CompletedTask
     End Function
+
+    Private Sub MonitorSettingChanged(sender As Object, e As EventArgs)
+        If hasStarted Then
+            SaveMonitorSettings()
+        End If
+    End Sub
 
     Private Async Function ListenLoopAsync(activeListener As UdpClient) As Task
         While True
@@ -971,6 +1054,13 @@ Public Class StudioMonitorControl
         MyBase.Dispose(disposing)
     End Sub
 End Class
+
+
+
+
+
+
+
 
 
 

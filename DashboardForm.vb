@@ -12,7 +12,7 @@ Public Class MainForm
     Private ReadOnly promoControl As New StudioMonitorControl("PROMO")
 
     Public Sub New()
-        Text = "Caspar Layer Monitor"
+        Text = "Playout Counter"
         StartPosition = FormStartPosition.CenterScreen
         FormBorderStyle = FormBorderStyle.Sizable
         MaximizeBox = True
@@ -73,3 +73,4 @@ Public Class MainForm
         panel.Visible = True
     End Sub
 End Class
+
